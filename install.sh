@@ -33,12 +33,16 @@ pkg install -y \
     tar \
     clang \
     make \
+    cmake \
+    pkg-config \
     openssl \
     libxml2 \
     libxslt \
     libjpeg-turbo \
     libpng \
     freetype \
+    libffi \
+    zlib \
     rust \
     golang \
     nmap \
@@ -46,6 +50,27 @@ pkg install -y \
     whois \
     jq \
     termux-api
+
+# ------------------------------------------------------------------
+# ANDROID API LEVEL FIX (for pydantic-core / Rust builds)
+# ------------------------------------------------------------------
+echo -e "${BLUE}[*] Detecting Android API Level...${NC}"
+if command -v getprop >/dev/null 2>&1; then
+    export ANDROID_API_LEVEL=$(getprop ro.build.version.sdk)
+    echo -e "${GREEN}[+] Android API Level: $ANDROID_API_LEVEL${NC}"
+else
+    echo -e "${YELLOW}[!] Could not detect API level. Defaulting to 34.${NC}"
+    export ANDROID_API_LEVEL=34
+fi
+
+# Ensure Rust target for Android ARM64
+rustup target add aarch64-linux-android 2>/dev/null || true
+
+# ------------------------------------------------------------------
+# Prepare Python build environment (safe for Termux)
+# ------------------------------------------------------------------
+echo -e "${BLUE}[*] Preparing Python build tools...${NC}"
+pip install --upgrade setuptools wheel maturin --no-cache-dir
 
 echo -e "${BLUE}[3/7] Setting up directories...${NC}"
 termux-setup-storage
@@ -59,8 +84,8 @@ mkdir -p $RECONX_DIR/data/state
 cd $RECONX_DIR
 
 echo -e "${BLUE}[4/7] Installing Python packages...${NC}"
-# DO NOT upgrade pip on Termux - it breaks the system package
-pip install -r "$RECONX_DIR/requirements.txt"
+# Prefer binary wheels when available (avoids heavy compilation)
+pip install --prefer-binary --no-cache-dir -r "$RECONX_DIR/requirements.txt"
 
 echo -e "${BLUE}[5/7] Installing Go tools...${NC}"
 export GOPATH=$HOME/go

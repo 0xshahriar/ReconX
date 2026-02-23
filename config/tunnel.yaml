@@ -1,0 +1,105 @@
+# ReconX Tunnel Configuration
+# Remote access via Cloudflare, Ngrok, or LocalTunnel
+
+tunnel:
+  # Primary tunnel service: cloudflare | ngrok | localtunnel
+  primary: cloudflare
+  
+  # Behavior settings
+  auto_start: true
+  auto_restart: true
+  notify_on_start: true
+  notify_on_reconnect: true
+  
+  # Security settings (mandatory when tunneling)
+  security:
+    require_auth: true
+    auth_password: ""  # Set this! Empty = no password (insecure)
+    allowed_ips: []    # IP whitelist (empty = allow all)
+    auto_shutdown: 7200  # Seconds of inactivity before tunnel close (2 hours)
+    enforce_https: true
+  
+  # Cloudflare Tunnel settings (recommended)
+  cloudflare:
+    enabled: true
+    tunnel_name: "reconx"
+    custom_domain: ""  # Requires paid plan or setup: yourdomain.com
+    credentials_file: "~/.cloudflared/cert.pem"
+    config_file: "~/.cloudflared/config.yml"
+    log_level: "info"
+    metrics: "localhost:45678"
+    
+    # Connection settings
+    protocol: "auto"  # auto | quic | http2
+    retries: 5
+    grace_period: 30
+  
+  # Ngrok settings (fallback)
+  ngrok:
+    enabled: true
+    auth_token: ""  # Required for stable URLs (get from dashboard.ngrok.com)
+    region: "us"    # us | eu | au | ap | sa | jp | in
+    subdomain: ""   # Paid feature only, leave empty for random
+    hostname: ""    # Paid feature: custom domain
+    inspect: false  # Disable web inspection interface
+    log_format: "json"
+    log_level: "info"
+    
+    # Connection pooling
+    pool_max_size: 10
+    pool_max_idle: 5
+  
+  # LocalTunnel settings (emergency fallback)
+  localtunnel:
+    enabled: true
+    subdomain: ""   # Request specific subdomain (may not be available)
+    host: "https://localtunnel.me"
+    
+  # Retry logic
+  retry:
+    max_attempts: 5
+    delay_seconds: 60
+    exponential_backoff: true
+    max_delay_seconds: 300
+  
+  # Health check
+  health_check:
+    enabled: true
+    interval_seconds: 30
+    timeout_seconds: 10
+    path: "/api/health"
+  
+  # Notification messages
+  messages:
+    start: "🌐 ReconX tunnel started: {url}"
+    reconnect: "🔌 ReconX back online after outage. Tunnel: {url}"
+    stop: "⛔ ReconX tunnel stopped"
+    error: "❌ Tunnel error: {error}"
+
+# Dashboard access settings
+dashboard:
+  title: "ReconX - Mobile Bug Bounty Platform"
+  favicon: "/static/assets/favicon.ico"
+  theme: "dark"  # dark | light | auto
+  
+  # Session settings
+  session_timeout: 3600  # 1 hour
+  remember_me_days: 7
+  
+  # Features
+  features:
+    live_terminal: true
+    real_time_charts: true
+    websocket_updates: true
+    dark_mode_toggle: true
+
+# Network detection
+network_detection:
+  enabled: true
+  check_interval: 10
+  ping_hosts:
+    - "1.1.1.1"
+    - "8.8.8.8"
+    - "9.9.9.9"
+  timeout: 5
+  threshold: 2  # Must fail 2 hosts to consider offline

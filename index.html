@@ -1,0 +1,1348 @@
+<!-- web/index.html -->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <title>ReconX - Mobile Bug Bounty Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        },
+                        primary: {
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                        },
+                        accent: {
+                            red: '#ef4444',
+                            orange: '#f97316',
+                            yellow: '#eab308',
+                            green: '#22c55e',
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        .animate-pulse-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .terminal-text {
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+        
+        .scan-line {
+            background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.2), transparent);
+            height: 1px;
+            animation: scan 3s linear infinite;
+        }
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .status-dot {
+            box-shadow: 0 0 8px currentColor;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .mobile-hide { display: none; }
+            .mobile-full { width: 100vw; margin-left: -1rem; }
+        }
+        
+        .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .htmx-request.htmx-indicator { opacity: 1; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 antialiased overflow-x-hidden">
+    <!-- Connection Status Bar -->
+    <div id="connection-bar" class="fixed top-0 left-0 right-0 z-50 h-1 bg-slate-800 transition-all duration-300">
+        <div id="connection-status" class="h-full w-full bg-accent-green transition-all duration-500"></div>
+    </div>
+
+    <!-- Mobile Header -->
+    <header class="fixed top-1 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800">
+        <div class="flex items-center justify-between px-4 py-3">
+            <div class="flex items-center gap-3">
+                <button id="menu-toggle" class="lg:hidden p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center font-bold text-white">R</div>
+                    <h1 class="font-bold text-lg tracking-tight">ReconX</h1>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- System Status -->
+                <div id="sys-status" class="hidden sm:flex items-center gap-3 text-xs mr-4">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-accent-green status-dot animate-pulse"></span>
+                        <span class="text-slate-400">Online</span>
+                    </div>
+                    <div class="flex items-center gap-1.5" id="battery-indicator">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span class="text-slate-400" id="battery-level">--%</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                        <span class="text-slate-400" id="ram-usage">--GB</span>
+                    </div>
+                </div>
+                
+                <!-- Emergency Stop -->
+                <button onclick="emergencyStop()" class="p-2 rounded-lg bg-accent-red/10 text-accent-red hover:bg-accent-red/20 transition-colors" title="Emergency Stop All Scans">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed left-0 top-[57px] bottom-0 w-64 bg-slate-900 border-r border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-30 overflow-y-auto">
+        <nav class="p-4 space-y-1">
+            <a href="#dashboard" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                <span class="font-medium">Dashboard</span>
+            </a>
+            <a href="#targets" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Targets</span>
+            </a>
+            <a href="#scans" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span>Active Scans</span>
+                <span id="active-scan-count" class="ml-auto bg-accent-orange/20 text-accent-orange text-xs px-2 py-0.5 rounded-full hidden">0</span>
+            </a>
+            <a href="#vulnerabilities" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span>Vulnerabilities</span>
+                <span id="vuln-count" class="ml-auto bg-accent-red/20 text-accent-red text-xs px-2 py-0.5 rounded-full hidden">0</span>
+            </a>
+            <a href="#wordlists" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Wordlists</span>
+            </a>
+            <a href="#reports" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>Reports</span>
+            </a>
+            <a href="#settings" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>Settings</span>
+            </a>
+        </nav>
+
+        <!-- Tunnel Status -->
+        <div class="p-4 mt-auto border-t border-slate-800">
+            <div class="glass-panel rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-slate-400">Remote Access</span>
+                    <span id="tunnel-status" class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">Offline</span>
+                </div>
+                <div id="tunnel-url" class="text-xs font-mono text-primary-400 truncate cursor-pointer hover:text-primary-300" onclick="copyTunnelUrl()" title="Click to copy">Not connected</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="lg:ml-64 pt-[57px] min-h-screen bg-slate-950">
+        <div class="p-4 lg:p-6 max-w-7xl mx-auto">
+            
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view-section space-y-6">
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass-panel rounded-xl p-4 border border-slate-700/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400 text-sm">Total Targets</span>
+                            <div class="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="stat-targets">0</div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-4 border border-slate-700/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400 text-sm">Active Scans</span>
+                            <div class="w-8 h-8 rounded-lg bg-accent-orange/10 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="stat-active">0</div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-4 border border-slate-700/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400 text-sm">Findings</span>
+                            <div class="w-8 h-8 rounded-lg bg-accent-red/10 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-accent-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="stat-findings">0</div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-4 border border-slate-700/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-slate-400 text-sm">Subdomains</span>
+                            <div class="w-8 h-8 rounded-lg bg-accent-green/10 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-white" id="stat-subdomains">0</div>
+                    </div>
+                </div>
+
+                <!-- System Health & Active Scan -->
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <!-- Active Scan Progress -->
+                    <div class="lg:col-span-2 glass-panel rounded-xl p-6 border border-slate-700/50">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-semibold text-white">Active Scan</h2>
+                            <div id="scan-controls" class="flex gap-2 hidden">
+                                <button onclick="pauseScan()" class="px-3 py-1.5 rounded-lg bg-accent-yellow/10 text-accent-yellow hover:bg-accent-yellow/20 text-sm font-medium transition-colors">Pause</button>
+                                <button onclick="stopScan()" class="px-3 py-1.5 rounded-lg bg-accent-red/10 text-accent-red hover:bg-accent-red/20 text-sm font-medium transition-colors">Stop</button>
+                            </div>
+                        </div>
+                        
+                        <div id="no-active-scan" class="text-center py-12 text-slate-500">
+                            <svg class="w-16 h-16 mx-auto mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            <p>No active scans running</p>
+                            <button onclick="showNewScanModal()" class="mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Start New Scan</button>
+                        </div>
+
+                        <div id="active-scan-container" class="hidden space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="font-medium text-white" id="active-target">example.com</h3>
+                                    <p class="text-sm text-slate-400" id="active-module">Subdomain Enumeration</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold text-primary-400" id="active-progress">0%</div>
+                                    <div class="text-xs text-slate-500" id="active-eta">ETA: --:--</div>
+                                </div>
+                            </div>
+                            
+                            <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="progress-bar" class="h-full bg-gradient-to-r from-primary-600 to-primary-400 transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-4 text-center py-4 border-t border-slate-800">
+                                <div>
+                                    <div class="text-lg font-semibold text-white" id="found-subdomains">0</div>
+                                    <div class="text-xs text-slate-500">Subdomains</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-semibold text-white" id="found-endpoints">0</div>
+                                    <div class="text-xs text-slate-500">Endpoints</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-semibold text-accent-red" id="found-vulns">0</div>
+                                    <div class="text-xs text-slate-500">Vulnerabilities</div>
+                                </div>
+                            </div>
+
+                            <!-- Live Terminal -->
+                            <div class="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
+                                <div class="flex items-center justify-between px-3 py-2 bg-slate-900 border-b border-slate-800">
+                                    <span class="text-xs font-mono text-slate-400">Live Output</span>
+                                    <div class="flex gap-1.5">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-accent-red"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-accent-yellow"></div>
+                                        <div class="w-2.5 h-2.5 rounded-full bg-accent-green"></div>
+                                    </div>
+                                </div>
+                                <div id="terminal-output" class="h-48 overflow-y-auto p-3 font-mono text-xs space-y-1 text-slate-300">
+                                    <div class="text-slate-500 italic">Waiting for scan to start...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Resources -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50">
+                        <h2 class="text-lg font-semibold text-white mb-6">System Health</h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-slate-400">Memory Usage</span>
+                                    <span class="text-white" id="mem-percent">0%</span>
+                                </div>
+                                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div id="mem-bar" class="h-full bg-primary-500 transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div class="mt-1 text-xs text-slate-500" id="mem-detail">0GB / 16GB</div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-slate-400">Storage</span>
+                                    <span class="text-white" id="storage-percent">0%</span>
+                                </div>
+                                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div id="storage-bar" class="h-full bg-accent-green transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                                <div class="mt-1 text-xs text-slate-500" id="storage-detail">0GB / 256GB</div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-slate-400">CPU Load</span>
+                                    <span class="text-white" id="cpu-percent">0%</span>
+                                </div>
+                                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div id="cpu-bar" class="h-full bg-accent-orange transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-slate-800">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm text-slate-400">LLM Status</span>
+                                    <span id="llm-status-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">Unloaded</span>
+                                </div>
+                                <div class="text-xs text-slate-500" id="llm-model">No model loaded</div>
+                                <div class="mt-2 flex gap-2">
+                                    <button onclick="switchLLM('llama3.1:8b')" class="flex-1 py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors">8B</button>
+                                    <button onclick="switchLLM('gemma3:4b')" class="flex-1 py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors">4B</button>
+                                    <button onclick="unloadLLM()" class="flex-1 py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors">Unload</button>
+                                </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-slate-800">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-slate-400">Resilience</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-accent-green animate-pulse"></span>
+                                        <span class="text-xs text-accent-green">Active</span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-slate-500">
+                                    Last checkpoint: <span id="last-checkpoint">Never</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Vulnerabilities -->
+                <div class="glass-panel rounded-xl p-6 border border-slate-700/50">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold text-white">Recent Critical Findings</h2>
+                        <a href="#vulnerabilities" class="text-sm text-primary-400 hover:text-primary-300">View All</a>
+                    </div>
+                    <div id="recent-vulns" class="space-y-3">
+                        <div class="text-center py-8 text-slate-500">No vulnerabilities found yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Targets View -->
+            <div id="view-targets" class="view-section hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-white">Targets</h2>
+                    <button onclick="showNewTargetModal()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Add Target
+                    </button>
+                </div>
+
+                <div class="glass-panel rounded-xl overflow-hidden border border-slate-700/50">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-900/50 text-slate-400">
+                                <tr>
+                                    <th class="px-6 py-4 font-medium">Target</th>
+                                    <th class="px-6 py-4 font-medium">Scope</th>
+                                    <th class="px-6 py-4 font-medium">Status</th>
+                                    <th class="px-6 py-4 font-medium">Last Scan</th>
+                                    <th class="px-6 py-4 font-medium">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="targets-list" class="divide-y divide-slate-800">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scans View -->
+            <div id="view-scans" class="view-section hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-white">Scan History</h2>
+                    <button onclick="showNewScanModal()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">New Scan</button>
+                </div>
+
+                <div id="scans-list" class="grid gap-4">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Wordlists View -->
+            <div id="view-wordlists" class="view-section hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-white">Wordlist Manager</h2>
+                    <button onclick="updateWordlists()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Update from SecLists
+                    </button>
+                </div>
+
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <!-- Subdomain Wordlists -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50">
+                        <h3 class="font-semibold text-white mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                            Subdomains
+                        </h3>
+                        <div class="space-y-3" id="wordlist-subdomains">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Fuzzing Wordlists -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50">
+                        <h3 class="font-semibold text-white mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            Fuzzing Payloads
+                        </h3>
+                        <div class="space-y-3" id="wordlist-fuzzing">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Directories & Files -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50">
+                        <h3 class="font-semibold text-white mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-accent-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                            Directories
+                        </h3>
+                        <div class="space-y-3" id="wordlist-directories">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Upload -->
+                <div class="glass-panel rounded-xl p-6 border border-slate-700/50 border-dashed">
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <h3 class="text-lg font-medium text-white mb-2">Upload Custom Wordlist</h3>
+                        <p class="text-sm text-slate-400 mb-4">Drop .txt files here or click to browse</p>
+                        <input type="file" id="wordlist-upload" accept=".txt" class="hidden" onchange="handleWordlistUpload(this)">
+                        <button onclick="document.getElementById('wordlist-upload').click()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors">Select File</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="view-settings" class="view-section hidden space-y-6">
+                <h2 class="text-2xl font-bold text-white">Settings</h2>
+                
+                <div class="grid lg:grid-cols-2 gap-6">
+                    <!-- General Settings -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50 space-y-6">
+                        <h3 class="font-semibold text-white">General</h3>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Default Scan Profile</label>
+                            <select id="setting-profile" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option value="stealthy">Stealthy (Slow, evasive)</option>
+                                <option value="normal" selected>Normal (Balanced)</option>
+                                <option value="aggressive">Aggressive (Fast, detectable)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Concurrent Scans</label>
+                            <input type="range" min="1" max="3" value="2" class="w-full accent-primary-500" oninput="document.getElementById('concurrent-val').textContent = this.value">
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>1</span>
+                                <span id="concurrent-val">2</span>
+                                <span>3</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <div class="text-sm font-medium text-slate-300">Auto-pause on Disconnect</div>
+                                <div class="text-xs text-slate-500">Pause scans when internet drops</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <div class="text-sm font-medium text-slate-300">Battery Protection</div>
+                                <div class="text-xs text-slate-500">Pause when battery below 20%</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Notification Settings -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50 space-y-6">
+                        <h3 class="font-semibold text-white">Notifications</h3>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Discord Webhook</label>
+                            <input type="url" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Telegram Bot Token</label>
+                            <input type="password" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Critical vulnerability found</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Scan completed</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Power/internet restored</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Tunnel Settings -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50 space-y-6">
+                        <h3 class="font-semibold text-white">Remote Access</h3>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Primary Tunnel</label>
+                            <select id="setting-tunnel" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option value="cloudflare" selected>Cloudflare Tunnel (Recommended)</option>
+                                <option value="ngrok">Ngrok</option>
+                                <option value="localtunnel">LocalTunnel</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Dashboard Password</label>
+                            <input type="password" value="admin123" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <div class="text-sm font-medium text-slate-300">Auto-start Tunnel</div>
+                                <div class="text-xs text-slate-500">Start tunnel when scan starts</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- LLM Settings -->
+                    <div class="glass-panel rounded-xl p-6 border border-slate-700/50 space-y-6">
+                        <h3 class="font-semibold text-white">LLM Configuration</h3>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Ollama Endpoint</label>
+                            <input type="url" value="http://localhost:11434" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <div class="text-sm font-medium text-slate-300">Auto-scale Models</div>
+                                <div class="text-xs text-slate-500">Switch models based on memory</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Unload After Idle (minutes)</label>
+                            <input type="number" value="5" min="1" max="60" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button onclick="resetSettings()" class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">Reset to Defaults</button>
+                    <button onclick="saveSettings()" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Save Settings</button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- New Target Modal -->
+    <div id="modal-target" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal('modal-target')"></div>
+        <div class="absolute inset-x-4 top-[10%] lg:inset-x-auto lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-lg bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-white mb-4">Add New Target</h3>
+                <form id="target-form" class="space-y-4" onsubmit="submitTarget(event)">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Target Name</label>
+                        <input type="text" name="name" required placeholder="e.g., HackerOne Program" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Primary Domain</label>
+                        <input type="text" name="domain" required placeholder="example.com" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">In-Scope (one per line)</label>
+                        <textarea name="scope" rows="3" placeholder="*.example.com&#10;api.example.com" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Out-of-Scope</label>
+                        <textarea name="exclusions" rows="2" placeholder="blog.example.com&#10;shop.example.com" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"></textarea>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4">
+                        <button type="button" onclick="closeModal('modal-target')" class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">Cancel</button>
+                        <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Add Target</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Scan Modal -->
+    <div id="modal-scan" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal('modal-scan')"></div>
+        <div class="absolute inset-x-4 top-[5%] lg:inset-x-auto lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-2xl bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-white mb-4">Configure Scan</h3>
+                <form id="scan-form" class="space-y-6" onsubmit="submitScan(event)">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Select Target</label>
+                        <select name="target_id" required class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <option value="">Choose a target...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Scan Profile</label>
+                        <div class="grid grid-cols-3 gap-3">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="profile" value="stealthy" class="sr-only peer">
+                                <div class="p-3 rounded-lg border border-slate-700 bg-slate-950 peer-checked:border-primary-500 peer-checked:bg-primary-500/10 text-center transition-all">
+                                    <div class="text-sm font-medium text-white">Stealthy</div>
+                                    <div class="text-xs text-slate-500">Slow & evasive</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="profile" value="normal" checked class="sr-only peer">
+                                <div class="p-3 rounded-lg border border-slate-700 bg-slate-950 peer-checked:border-primary-500 peer-checked:bg-primary-500/10 text-center transition-all">
+                                    <div class="text-sm font-medium text-white">Normal</div>
+                                    <div class="text-xs text-slate-500">Balanced</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="profile" value="aggressive" class="sr-only peer">
+                                <div class="p-3 rounded-lg border border-slate-700 bg-slate-950 peer-checked:border-primary-500 peer-checked:bg-primary-500/10 text-center transition-all">
+                                    <div class="text-sm font-medium text-white">Aggressive</div>
+                                    <div class="text-xs text-slate-500">Fast & thorough</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Modules</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="subdomain_enum" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Subdomain Enum</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="port_scan" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Port Scan</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="http_probe" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">HTTP Probe</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="fuzzing" class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Directory Fuzzing</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="js_analysis" class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">JS Analysis</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="nuclei" checked class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Nuclei Scan</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="git_recon" class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Git Recon</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-3 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer hover:bg-slate-900 transition-colors">
+                                <input type="checkbox" name="modules" value="cloud_recon" class="rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500">
+                                <span class="text-sm text-slate-300">Cloud Recon</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 p-4 rounded-lg bg-primary-500/10 border border-primary-500/20">
+                        <svg class="w-5 h-5 text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="text-sm text-primary-300">Estimated duration: <span id="est-duration">45-90 minutes</span> depending on target size</span>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button type="button" onclick="closeModal('modal-scan')" class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">Cancel</button>
+                        <button type="submit" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Start Scan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        const state = {
+            ws: null,
+            currentView: 'dashboard',
+            activeScan: null,
+            targets: [],
+            wordlists: {},
+            systemStats: {
+                memory: { used: 0, total: 16 },
+                storage: { used: 0, total: 256 },
+                cpu: 0,
+                battery: 100
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initWebSocket();
+            initNavigation();
+            loadInitialData();
+            startSystemMonitoring();
+            
+            // Mobile menu toggle
+            document.getElementById('menu-toggle').addEventListener('click', () => {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('-translate-x-full');
+            });
+        });
+
+        // WebSocket Connection
+        function initWebSocket() {
+            const wsUrl = `ws://${window.location.host}/ws/system`;
+            state.ws = new WebSocket(wsUrl);
+
+            state.ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+            };
+
+            state.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            state.ws.onclose = () => {
+                console.log('WebSocket disconnected, retrying...');
+                updateConnectionStatus(false);
+                setTimeout(initWebSocket, 5000);
+            };
+
+            state.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            switch(data.type) {
+                case 'system_stats':
+                    updateSystemStats(data.payload);
+                    break;
+                case 'scan_update':
+                    updateScanProgress(data.payload);
+                    break;
+                case 'terminal_output':
+                    appendTerminalOutput(data.payload);
+                    break;
+                case 'vulnerability_found':
+                    addVulnerability(data.payload);
+                    break;
+                case 'tunnel_update':
+                    updateTunnelStatus(data.payload);
+                    break;
+                case 'llm_status':
+                    updateLLMStatus(data.payload);
+                    break;
+            }
+        }
+
+        // Navigation
+        function initNavigation() {
+            document.querySelectorAll('.nav-item').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const target = link.getAttribute('href').substring(1);
+                    switchView(target);
+                    
+                    // Close mobile menu
+                    if (window.innerWidth < 1024) {
+                        document.getElementById('sidebar').classList.add('-translate-x-full');
+                    }
+                });
+            });
+        }
+
+        function switchView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('bg-primary-500/10', 'text-primary-400', 'border', 'border-primary-500/20');
+                el.classList.add('text-slate-400');
+            });
+
+            // Show target view
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            
+            // Update nav active state
+            const activeNav = document.querySelector(`a[href="#${viewName}"]`);
+            if (activeNav) {
+                activeNav.classList.remove('text-slate-400');
+                activeNav.classList.add('bg-primary-500/10', 'text-primary-400', 'border', 'border-primary-500/20');
+            }
+
+            state.currentView = viewName;
+
+            // Load view-specific data
+            if (viewName === 'targets') loadTargets();
+            if (viewName === 'wordlists') loadWordlists();
+        }
+
+        // System Monitoring
+        function startSystemMonitoring() {
+            // Update every 5 seconds
+            setInterval(() => {
+                fetchSystemStats();
+            }, 5000);
+            
+            // Battery API
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(battery => {
+                    updateBatteryDisplay(battery);
+                    battery.addEventListener('levelchange', () => updateBatteryDisplay(battery));
+                });
+            }
+        }
+
+        function fetchSystemStats() {
+            fetch('/api/system/status')
+                .then(r => r.json())
+                .then(data => {
+                    updateSystemStats(data);
+                })
+                .catch(console.error);
+        }
+
+        function updateSystemStats(data) {
+            // Memory
+            const memPercent = (data.memory.used / data.memory.total) * 100;
+            document.getElementById('mem-percent').textContent = memPercent.toFixed(1) + '%';
+            document.getElementById('mem-bar').style.width = memPercent + '%';
+            document.getElementById('mem-detail').textContent = `${data.memory.used.toFixed(1)}GB / ${data.memory.total}GB`;
+            document.getElementById('ram-usage').textContent = data.memory.used.toFixed(1) + 'GB';
+
+            // Storage
+            const storagePercent = (data.storage.used / data.storage.total) * 100;
+            document.getElementById('storage-percent').textContent = storagePercent.toFixed(1) + '%';
+            document.getElementById('storage-bar').style.width = storagePercent + '%';
+            document.getElementById('storage-detail').textContent = `${data.storage.used}GB / ${data.storage.total}GB`;
+
+            // CPU
+            document.getElementById('cpu-percent').textContent = data.cpu + '%';
+            document.getElementById('cpu-bar').style.width = data.cpu + '%';
+
+            // Battery
+            if (data.battery) {
+                document.getElementById('battery-level').textContent = data.battery + '%';
+            }
+        }
+
+        function updateBatteryDisplay(battery) {
+            const level = Math.round(battery.level * 100);
+            document.getElementById('battery-level').textContent = level + '%';
+        }
+
+        function updateConnectionStatus(connected) {
+            const bar = document.getElementById('connection-status');
+            if (connected) {
+                bar.classList.remove('bg-accent-red', 'bg-accent-yellow');
+                bar.classList.add('bg-accent-green');
+            } else {
+                bar.classList.remove('bg-accent-green');
+                bar.classList.add('bg-accent-red');
+            }
+        }
+
+        // Scan Management
+        function showNewScanModal() {
+            // Populate targets
+            const select = document.querySelector('#scan-form select[name="target_id"]');
+            select.innerHTML = '<option value="">Choose a target...</option>';
+            state.targets.forEach(target => {
+                select.innerHTML += `<option value="${target.id}">${target.name} (${target.domain})</option>`;
+            });
+            
+            document.getElementById('modal-scan').classList.remove('hidden');
+        }
+
+        function submitScan(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const modules = Array.from(formData.getAll('modules'));
+            
+            const payload = {
+                target_id: formData.get('target_id'),
+                profile: formData.get('profile'),
+                modules: modules
+            };
+
+            fetch('/api/scans', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                closeModal('modal-scan');
+                state.activeScan = data;
+                updateActiveScanUI(data);
+                showNotification('Scan started successfully', 'success');
+            })
+            .catch(err => {
+                showNotification('Failed to start scan: ' + err.message, 'error');
+            });
+        }
+
+        function updateScanProgress(data) {
+            if (!state.activeScan || state.activeScan.id !== data.scan_id) return;
+
+            document.getElementById('active-progress').textContent = data.progress + '%';
+            document.getElementById('progress-bar').style.width = data.progress + '%';
+            document.getElementById('active-module').textContent = data.current_module;
+            document.getElementById('found-subdomains').textContent = data.stats.subdomains;
+            document.getElementById('found-endpoints').textContent = data.stats.endpoints;
+            document.getElementById('found-vulns').textContent = data.stats.vulnerabilities;
+
+            if (data.progress >= 100) {
+                showNotification('Scan completed!', 'success');
+                state.activeScan = null;
+                setTimeout(() => updateActiveScanUI(null), 3000);
+            }
+        }
+
+        function updateActiveScanUI(scan) {
+            const noScan = document.getElementById('no-active-scan');
+            const container = document.getElementById('active-scan-container');
+            const controls = document.getElementById('scan-controls');
+
+            if (scan) {
+                noScan.classList.add('hidden');
+                container.classList.remove('hidden');
+                controls.classList.remove('hidden');
+                document.getElementById('active-target').textContent = scan.target_name;
+                document.getElementById('active-scan-count').textContent = '1';
+                document.getElementById('active-scan-count').classList.remove('hidden');
+            } else {
+                noScan.classList.remove('hidden');
+                container.classList.add('hidden');
+                controls.classList.add('hidden');
+                document.getElementById('active-scan-count').classList.add('hidden');
+            }
+        }
+
+        function pauseScan() {
+            if (!state.activeScan) return;
+            fetch(`/api/scans/${state.activeScan.id}/pause`, { method: 'POST' })
+                .then(() => showNotification('Scan paused', 'info'));
+        }
+
+        function stopScan() {
+            if (!state.activeScan) return;
+            if (!confirm('Are you sure you want to stop the current scan?')) return;
+            
+            fetch(`/api/scans/${state.activeScan.id}/stop`, { method: 'POST' })
+                .then(() => {
+                    state.activeScan = null;
+                    updateActiveScanUI(null);
+                    showNotification('Scan stopped', 'info');
+                });
+        }
+
+        function emergencyStop() {
+            if (!confirm('EMERGENCY STOP: This will kill all running scans immediately. Continue?')) return;
+            
+            fetch('/api/system/emergency-stop', { method: 'POST' })
+                .then(() => {
+                    state.activeScan = null;
+                    updateActiveScanUI(null);
+                    showNotification('Emergency stop executed', 'error');
+                });
+        }
+
+        // Terminal
+        function appendTerminalOutput(line) {
+            const terminal = document.getElementById('terminal-output');
+            const div = document.createElement('div');
+            div.className = 'font-mono text-xs';
+            
+            // Color coding based on content
+            if (line.includes('[ERROR]') || line.includes('error')) {
+                div.className += ' text-accent-red';
+            } else if (line.includes('[INFO]') || line.includes('found')) {
+                div.className += ' text-accent-green';
+            } else if (line.includes('[WARN]')) {
+                div.className += ' text-accent-yellow';
+            } else {
+                div.className += ' text-slate-300';
+            }
+            
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${line}`;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+
+            // Keep only last 100 lines
+            while (terminal.children.length > 100) {
+                terminal.removeChild(terminal.firstChild);
+            }
+        }
+
+        // Targets Management
+        function showNewTargetModal() {
+            document.getElementById('modal-target').classList.remove('hidden');
+        }
+
+        function submitTarget(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            const payload = {
+                name: formData.get('name'),
+                domain: formData.get('domain'),
+                scope: formData.get('scope').split('\n').filter(s => s.trim()),
+                exclusions: formData.get('exclusions').split('\n').filter(s => s.trim())
+            };
+
+            fetch('/api/targets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                state.targets.push(data);
+                closeModal('modal-target');
+                e.target.reset();
+                loadTargets();
+                showNotification('Target added successfully', 'success');
+            });
+        }
+
+        function loadTargets() {
+            fetch('/api/targets')
+                .then(r => r.json())
+                .then(data => {
+                    state.targets = data;
+                    renderTargets();
+                    document.getElementById('stat-targets').textContent = data.length;
+                });
+        }
+
+        function renderTargets() {
+            const tbody = document.getElementById('targets-list');
+            tbody.innerHTML = state.targets.map(t => `
+                <tr class="hover:bg-slate-800/50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-white">${t.name}</div>
+                        <div class="text-xs text-slate-500">${t.domain}</div>
+                    </td>
+                    <td class="px-6 py-4 text-slate-400 text-xs">
+                        ${t.scope.length} in-scope<br>
+                        ${t.exclusions.length} exclusions
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-full text-xs ${t.status === 'active' ? 'bg-accent-green/20 text-accent-green' : 'bg-slate-700 text-slate-400'}">
+                            ${t.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-slate-400 text-sm">
+                        ${t.last_scan || 'Never'}
+                    </td>
+                    <td class="px-6 py-4">
+                        <button onclick="deleteTarget('${t.id}')" class="text-accent-red hover:text-accent-red/80 text-sm">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function deleteTarget(id) {
+            if (!confirm('Delete this target?')) return;
+            fetch(`/api/targets/${id}`, { method: 'DELETE' })
+                .then(() => {
+                    state.targets = state.targets.filter(t => t.id !== id);
+                    renderTargets();
+                    showNotification('Target deleted', 'info');
+                });
+        }
+
+        // Wordlists
+        function loadWordlists() {
+            fetch('/api/wordlists')
+                .then(r => r.json())
+                .then(data => {
+                    state.wordlists = data;
+                    renderWordlists();
+                });
+        }
+
+        function renderWordlists() {
+            // Subdomains
+            const subContainer = document.getElementById('wordlist-subdomains');
+            subContainer.innerHTML = (state.wordlists.subdomains || []).map(w => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <div>
+                        <div class="text-sm font-medium text-white">${w.name}</div>
+                        <div class="text-xs text-slate-500">${w.count.toLocaleString()} entries • ${w.size}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="previewWordlist('${w.path}')" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" title="Preview">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Fuzzing
+            const fuzzContainer = document.getElementById('wordlist-fuzzing');
+            fuzzContainer.innerHTML = (state.wordlists.fuzzing || []).map(w => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <div>
+                        <div class="text-sm font-medium text-white">${w.name}</div>
+                        <div class="text-xs text-slate-500">${w.count.toLocaleString()} entries</div>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded bg-accent-orange/10 text-accent-orange">${w.category}</span>
+                </div>
+            `).join('');
+
+            // Directories
+            const dirContainer = document.getElementById('wordlist-directories');
+            dirContainer.innerHTML = (state.wordlists.directories || []).map(w => `
+                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <div>
+                        <div class="text-sm font-medium text-white">${w.name}</div>
+                        <div class="text-xs text-slate-500">${w.count.toLocaleString()} entries</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateWordlists() {
+            showNotification('Updating wordlists from SecLists...', 'info');
+            fetch('/api/wordlists/update', { method: 'POST' })
+                .then(() => {
+                    setTimeout(loadWordlists, 2000);
+                    showNotification('Wordlists updated', 'success');
+                });
+        }
+
+        function handleWordlistUpload(input) {
+            if (!input.files.length) return;
+            
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/wordlists/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(() => {
+                loadWordlists();
+                showNotification('Wordlist uploaded', 'success');
+            });
+        }
+
+        // LLM Management
+        function switchLLM(model) {
+            fetch('/api/llm/switch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model })
+            })
+            .then(() => showNotification(`Switching to ${model}...`, 'info'));
+        }
+
+        function unloadLLM() {
+            fetch('/api/llm/unload', { method: 'POST' })
+                .then(() => showNotification('LLM unloaded to free memory', 'info'));
+        }
+
+        function updateLLMStatus(data) {
+            const badge = document.getElementById('llm-status-badge');
+            const modelText = document.getElementById('llm-model');
+            
+            if (data.loaded) {
+                badge.textContent = 'Active';
+                badge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green';
+                modelText.textContent = data.model;
+            } else {
+                badge.textContent = 'Unloaded';
+                badge.className = 'text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300';
+                modelText.textContent = 'No model loaded';
+            }
+        }
+
+        // Tunnel
+        function updateTunnelStatus(data) {
+            const status = document.getElementById('tunnel-status');
+            const url = document.getElementById('tunnel-url');
+            
+            if (data.active) {
+                status.textContent = 'Online';
+                status.className = 'text-xs px-2 py-0.5 rounded-full bg-accent-green/20 text-accent-green';
+                url.textContent = data.url;
+                url.title = 'Click to copy';
+            } else {
+                status.textContent = 'Offline';
+                status.className = 'text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300';
+                url.textContent = 'Not connected';
+            }
+        }
+
+        function copyTunnelUrl() {
+            const url = document.getElementById('tunnel-url').textContent;
+            if (url && url !== 'Not connected') {
+                navigator.clipboard.writeText(url);
+                showNotification('Tunnel URL copied!', 'success');
+            }
+        }
+
+        // Utilities
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create toast notification
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-accent-green/90',
+                error: 'bg-accent-red/90',
+                warning: 'bg-accent-yellow/90',
+                info: 'bg-primary-600/90'
+            };
+            
+            toast.className = `fixed bottom-4 right-4 ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg z-50 transform translate-y-0 transition-all duration-300 flex items-center gap-2`;
+            toast.innerHTML = `
+                <span class="text-sm font-medium">${message}</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function loadInitialData() {
+            loadTargets();
+            // Simulate initial stats
+            updateSystemStats({
+                memory: { used: 4.2, total: 16 },
+                storage: { used: 45, total: 256 },
+                cpu: 15,
+                battery: 85
+            });
+        }
+
+        // Settings
+        function saveSettings() {
+            showNotification('Settings saved successfully', 'success');
+        }
+
+        function resetSettings() {
+            if (confirm('Reset all settings to defaults?')) {
+                showNotification('Settings reset', 'info');
+            }
+        }
+
+        // Close modals on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
+            }
+        });
+    </script>
+</body>
+</html>

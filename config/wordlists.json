@@ -1,0 +1,223 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Wordlist definitions and checksums for ReconX",
+    "default_source": "SecLists"
+  },
+  "wordlists": {
+    "subdomains-small": {
+      "name": "subdomains-small.txt",
+      "description": "Small subdomain wordlist (~100k entries)",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-110000.txt",
+      "local_path": "wordlists/subdomains-small.txt",
+      "size_estimate": "1MB",
+      "line_count": 110000,
+      "checksum": "",
+      "category": "subdomains",
+      "priority": 1
+    },
+    "subdomains-medium": {
+      "name": "subdomains-medium.txt",
+      "description": "Medium subdomain wordlist (~1M entries)",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-5000.txt",
+      "local_path": "wordlists/subdomains-medium.txt",
+      "size_estimate": "10MB",
+      "line_count": 1000000,
+      "checksum": "",
+      "category": "subdomains",
+      "priority": 2
+    },
+    "subdomains-large": {
+      "name": "subdomains-large.txt",
+      "description": "Large subdomain wordlist (~10M entries)",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-20000.txt",
+      "local_path": "wordlists/subdomains-large.txt",
+      "size_estimate": "100MB",
+      "line_count": 10000000,
+      "checksum": "",
+      "category": "subdomains",
+      "priority": 3,
+      "optional": true
+    },
+    "directories": {
+      "name": "directories.txt",
+      "description": "Common directory names for fuzzing",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common.txt",
+      "local_path": "wordlists/directories.txt",
+      "size_estimate": "500KB",
+      "line_count": 4700,
+      "checksum": "",
+      "category": "directories",
+      "priority": 1
+    },
+    "files": {
+      "name": "files.txt",
+      "description": "Common file names and extensions",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-large-files.txt",
+      "local_path": "wordlists/files.txt",
+      "size_estimate": "2MB",
+      "line_count": 37000,
+      "checksum": "",
+      "category": "files",
+      "priority": 1
+    },
+    "parameters": {
+      "name": "parameters.txt",
+      "description": "Common HTTP parameter names",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/burp-parameter-names.txt",
+      "local_path": "wordlists/parameters.txt",
+      "size_estimate": "100KB",
+      "line_count": 2500,
+      "checksum": "",
+      "category": "parameters",
+      "priority": 1
+    },
+    "api-endpoints": {
+      "name": "api-endpoints.txt",
+      "description": "Common API endpoint paths",
+      "url": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/api/api-endpoints.txt",
+      "local_path": "wordlists/api-endpoints.txt",
+      "size_estimate": "10KB",
+      "line_count": 300,
+      "checksum": "",
+      "category": "api",
+      "priority": 1
+    }
+  },
+  "fuzzing_payloads": {
+    "xss": {
+      "name": "xss.txt",
+      "description": "XSS payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/xss-payload-list/master/Intruder/xss-payload-list.txt",
+      "local_path": "wordlists/fuzzing/xss.txt",
+      "size_estimate": "50KB",
+      "line_count": 1000,
+      "category": "xss",
+      "contexts": ["html", "attribute", "javascript", "url"]
+    },
+    "sqli": {
+      "name": "sqli.txt",
+      "description": "SQL Injection payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/sql-injection-payload-list/master/Intruder/detect/MySQL/MySQL.txt",
+      "local_path": "wordlists/fuzzing/sqli.txt",
+      "size_estimate": "30KB",
+      "line_count": 600,
+      "category": "sqli",
+      "databases": ["mysql", "postgresql", "mssql", "oracle", "sqlite"]
+    },
+    "ssrf": {
+      "name": "ssrf.txt",
+      "description": "SSRF payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/ssrf-payload-list/master/Intruder/ssrf-payloads.txt",
+      "local_path": "wordlists/fuzzing/ssrf.txt",
+      "size_estimate": "10KB",
+      "line_count": 200,
+      "category": "ssrf"
+    },
+    "lfi": {
+      "name": "lfi.txt",
+      "description": "Local File Inclusion payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/lfi-rfi-payload-list/master/Intruder/LFI/LFI-List.txt",
+      "local_path": "wordlists/fuzzing/lfi.txt",
+      "size_estimate": "20KB",
+      "line_count": 400,
+      "category": "lfi",
+      "os": ["linux", "windows"]
+    },
+    "rce": {
+      "name": "rce.txt",
+      "description": "Remote Code Execution payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/command-injection-payload-list/master/Intruder/command-injection-template.txt",
+      "local_path": "wordlists/fuzzing/rce.txt",
+      "size_estimate": "15KB",
+      "line_count": 300,
+      "category": "rce"
+    },
+    "ssti": {
+      "name": "ssti.txt",
+      "description": "Server-Side Template Injection payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/ssti-payloads/master/Intruder/ssti-payloads.txt",
+      "local_path": "wordlists/fuzzing/ssti.txt",
+      "size_estimate": "10KB",
+      "line_count": 250,
+      "category": "ssti",
+      "engines": ["jinja2", "twig", "freemarker", "velocity"]
+    },
+    "xxe": {
+      "name": "xxe.txt",
+      "description": "XML External Entity payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/xxe-injection-payload-list/master/Intruder/xxe-payload-list.txt",
+      "local_path": "wordlists/fuzzing/xxe.txt",
+      "size_estimate": "8KB",
+      "line_count": 150,
+      "category": "xxe"
+    },
+    "open-redirect": {
+      "name": "open-redirect.txt",
+      "description": "Open Redirect payloads",
+      "url": "https://raw.githubusercontent.com/payloadbox/open-redirect-payload-list/master/Intruder/open-redirect-payloads.txt",
+      "local_path": "wordlists/fuzzing/open-redirect.txt",
+      "size_estimate": "5KB",
+      "line_count": 100,
+      "category": "open-redirect"
+    }
+  },
+  "gf_patterns": {
+    "xss": {
+      "name": "xss.json",
+      "description": "GF patterns for XSS detection",
+      "pattern": "(\\?|&)([a-zA-Z0-9_]+)=([^&]*)(<|>|\"|'|%3C|%3E|%22|%27)",
+      "severity": "high"
+    },
+    "sqli": {
+      "name": "sqli.json",
+      "description": "GF patterns for SQL Injection",
+      "pattern": "(\\?|&)([a-zA-Z0-9_]+)=([^&]*)(union|select|insert|update|delete|drop|--+|#|%23)",
+      "severity": "critical"
+    },
+    "ssrf": {
+      "name": "ssrf.json",
+      "description": "GF patterns for SSRF",
+      "pattern": "(url|path|dest|redirect|uri|src)=([^&]*)",
+      "severity": "high"
+    },
+    "lfi": {
+      "name": "lfi.json",
+      "description": "GF patterns for LFI",
+      "pattern": "(file|path|folder|dir|include|page)=([^&]*)(\\.\\.|%2e%2e|/etc/|/var/|/proc/)",
+      "severity": "high"
+    },
+    "rce": {
+      "name": "rce.json",
+      "description": "GF patterns for RCE",
+      "pattern": "(cmd|command|exec|execute|ping|query|code)=([^&]*)",
+      "severity": "critical"
+    },
+    "idor": {
+      "name": "idor.json",
+      "description": "GF patterns for IDOR",
+      "pattern": "(id|user|account|number|order|item|profile)=([0-9]+)",
+      "severity": "medium"
+    },
+    "debug": {
+      "name": "debug.json",
+      "description": "GF patterns for debug endpoints",
+      "pattern": "(debug|test|dev|staging|admin|api|internal|local)",
+      "severity": "low"
+    },
+    "api_keys": {
+      "name": "api-keys.json",
+      "description": "GF patterns for API keys in URLs",
+      "pattern": "(api[_-]?key|token|secret|password|passwd|pwd)=([^&]{16,})",
+      "severity": "critical"
+    }
+  },
+  "update_settings": {
+    "auto_update": true,
+    "update_interval_days": 7,
+    "backup_before_update": true,
+    "verify_checksums": false,
+    "max_retries": 3,
+    "timeout_seconds": 300
+  }
+}

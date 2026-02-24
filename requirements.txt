@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+websockets
+requests
+beautifulsoup4
+aiosqlite
+python-multipart
+jinja2
+aiofiles
+google-generativeai
